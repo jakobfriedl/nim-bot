@@ -1,13 +1,16 @@
 import 
-    dimscord, asyncdispatch, options,
-    strutils, random, times
+    dimscord, dimscmd,
+    asyncdispatch, options, 
+    strutils, sequtils, strformat, 
+    random, math,
+    macros
 
-let token = readFile("./.env").strip()
+let env = readFile("./.env").strip().splitLines()
+let token = env[0]
+let guild = env[1]
 
 let discord = newDiscordClient(token)
-
-proc onReady(s: Shard, r: Ready) {.event(discord).} =
-    echo "Ready as: " & $r.user
+var cmd = discord.newHandler()
 
 type 
     Action = enum
@@ -17,7 +20,6 @@ type
 
     Answer = object
         title: string
-        desc: string
         image: string
         color: int
         action: Action
@@ -26,32 +28,70 @@ const badriggAnswers: seq[Answer] = @[
     Answer(
         title: "Ja",
         image: "https://i.postimg.cc/G4sJdj3N/wochenende.png",
-        color: 0x00aa00
+        color: 0x00aa00,
+        action: None
     ),
     Answer(
         title: "Nein",
         image: "https://i.postimg.cc/kBHF0HCK/depririgg.png",
-        color: 0xaa0000
+        color: 0xaa0000,
+        action: None
     ),
     Answer(
         title: "Vielleicht",
         image: "https://i.postimg.cc/bGc0J2sv/ebiroller.png",
-        color: 0xaaaa00
+        color: 0xaaaa00,
+        action: None
     ),
     Answer(
-        title: "Gusch",
-        desc: "Hoid di goschn",
+        title: "Dumme Frage",
         color: 0x000aaa,
         action: Mute
     )
 ]
 
-# Simple command using Nim (Ping command which edits and replies with the bot latency)
+proc reply(m: Message, msg: string): Future[Message] {.async.} = 
+    return await discord.api.sendMessage(m.channel_id, msg)
+
+proc reply(i: Interaction, msg: string) {.async.} =
+    echo i
+    let response = InteractionResponse(
+        kind: irtChannelMessageWithSource,
+        data: some InteractionApplicationCommandCallbackData(
+            content: msg
+        )
+    )
+    await discord.api.createInteractionResponse(i.id, i.token, response)
+
+## Chat Commands
+# sum [number] ... 
+cmd.addChat("sum") do (nums: seq[int]): 
+    discard await msg.reply($nums.sum)
+
+# multiply [number] ...
+cmd.addChat("multiply") do (nums: seq[int]): 
+    discard await msg.reply($(nums.foldl(a * b)))
+
+## Slash Commands
+# mute [user] [time]
+cmd.addSlash("mute", guildID = guild) do (user: User, time: int): 
+    ## Mute a user for a duration of time
+    discard
+
+proc onReady(s: Shard, r: Ready) {.event(discord).} =
+    echo "Ready as: " & $r.user
+    await cmd.registerCommands() 
+
 proc messageCreate(s: Shard, m: Message) {.event(discord).} =
     # check if the message-author is a bot
     if m.author.bot: return
 
-    if m.content.toLowerAscii.startsWith("magischer badrigg"):
+    discard await cmd.handleMessage("!", s, m)
+
+    if m.content.toLowerAscii.join("").contains("cheg"): 
+        discard m.reply("cheg 👍")
+
+    if m.content.toLowerAscii.startsWith("magischer linuxmann"):
 
         let answer = sample(badriggAnswers)
 
@@ -64,11 +104,14 @@ proc messageCreate(s: Shard, m: Message) {.event(discord).} =
         discard await discord.api.sendMessage(
             m.channel_id,
             embeds = @[Embed(
-                title: some answer.title, 
-                description: some answer.desc,
+                title: some fmt"Q: {m.content}", 
+                description: some fmt"A: {answer.title}",
                 image: some EmbedImage(url: answer.image),
                 color: some answer.color
             )]
         )
+
+proc interactionCreate(s: Shard, i: Interaction) {.event(discord).} =
+    discard await cmd.handleInteraction(s, i)
 
 waitFor discord.startSession()
