@@ -9,5 +9,7 @@ General purpose discord bot written in Nim using the dimscord-library.
 ## Features:
 - !sum [number] ...
 - !multiply [number] ...
+- !random [min] [max]
+- !echo [string]
 - magischer linuxmann [question]
 - cheg

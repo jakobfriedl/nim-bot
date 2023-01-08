@@ -72,6 +72,14 @@ cmd.addChat("sum") do (nums: seq[int]):
 cmd.addChat("multiply") do (nums: seq[int]): 
     discard await msg.reply($(nums.foldl(a * b)))
 
+# random [number] [number]
+cmd.addChat("random") do (min: int, max: int): 
+    discard await msg.reply($(rand(min..max)))
+
+# echo [string]
+cmd.addChat("echo") do (str: seq[string]): 
+    discard await msg.reply($str.join(" "))
+
 ## Slash Commands
 # mute [user] [time]
 cmd.addSlash("mute", guildID = guild) do (user: User, time: int): 
